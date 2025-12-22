@@ -17,13 +17,6 @@ import hmac
 # BASIC STYLING & CONFIG
 # =========================
 
-st.set_page_config(
-    page_title="FX Portfolio Tracker",
-    page_icon="💱",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
 st.markdown("""
 <style>
 /* Hide the 'Press Enter to submit form' helper text everywhere */
@@ -33,6 +26,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.set_page_config(
+    page_title="FX Portfolio Tracker",
+    page_icon="💱",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 # Tighten layout a bit
 st.markdown("""
@@ -132,60 +131,15 @@ div[data-testid="stTabs"] button + button {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown(
-    """
-    <style>
-    /* Align password show/hide icon vertically */
-    div[data-baseweb="input"] > div {
-        align-items: center;
-        margin-top: 6px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
 
 # =========================
-# FILES, USERS & SETTINGS
+# FILES & SETTINGS
 # =========================
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
 USERS_FILE = DATA_DIR / "users.json"
-
-DEFAULT_BASE_CCY = "SEK"
-
-# We persist only the raw inputs; all running/PL columns are recomputed
-FX_INPUT_COLS = [
-    "date",          # datetime
-    "foreign_ccy",   # e.g. EUR, USD
-    "txn_type",      # Buy, Sell, Debit, Credit
-    "foreign_amount",
-    "fx_rate",       # base per 1 foreign
-    "fee_foreign",   # fee in foreign
-    "memo",
-]
-
-
-def load_settings(settings_file: Path) -> dict:
-    if settings_file.exists():
-        try:
-            return json.loads(settings_file.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def save_settings(settings: dict, settings_file: Path) -> None:
-    try:
-        settings_file.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    except Exception:
-        # Failing to save settings should not crash the app
-        pass
-
 
 def load_users() -> dict:
     if USERS_FILE.exists():
@@ -195,13 +149,11 @@ def load_users() -> dict:
             return {}
     return {}
 
-
 def save_users(users: dict) -> None:
     try:
         USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
     except Exception:
         pass
-
 
 def _hash_password(password: str, salt_b64: str | None = None) -> tuple[str, str]:
     """
@@ -218,11 +170,9 @@ def _hash_password(password: str, salt_b64: str | None = None) -> tuple[str, str
     hash_b64 = base64.b64encode(dk).decode("utf-8")
     return salt_b64, hash_b64
 
-
 def verify_password(password: str, salt_b64: str, hash_b64: str) -> bool:
     _, candidate_hash = _hash_password(password, salt_b64=salt_b64)
     return hmac.compare_digest(candidate_hash, hash_b64)
-
 
 def create_user(username: str, password: str) -> tuple[bool, str]:
     """
@@ -242,7 +192,6 @@ def create_user(username: str, password: str) -> tuple[bool, str]:
     save_users(users)
     return True, "Account created."
 
-
 def authenticate_user(username: str, password: str) -> tuple[bool, str, str | None]:
     """
     Returns (ok, message, safe_username).
@@ -258,6 +207,7 @@ def authenticate_user(username: str, password: str) -> tuple[bool, str, str | No
         return True, "Logged in.", safe
     return False, "Incorrect password.", None
 
+DEFAULT_BASE_CCY = "SEK"
 
 def get_user_paths(username: str) -> tuple[Path, Path]:
     """
@@ -269,9 +219,39 @@ def get_user_paths(username: str) -> tuple[Path, Path]:
         st.stop()
 
     trades_file = DATA_DIR / f"fx_trades_{safe}.csv"
-    settings_file = DATA_DIR / f"settings_{safe}.json"
+    settings_file = DATA_DIR / f"fx_settings_{safe}.json"
     return trades_file, settings_file
 
+# Defaults (overridden after login)
+DATA_FILE = Path("fx_trades.csv")
+SETTINGS_FILE = Path("fx_settings.json")
+
+# We persist only the raw inputs; all running/PL columns are recomputed
+FX_INPUT_COLS = [
+    "date",          # datetime
+    "foreign_ccy",   # e.g. EUR, USD
+    "txn_type",      # Buy, Sell, Debit, Credit
+    "foreign_amount",
+    "fx_rate",       # base per 1 foreign
+    "fee_foreign",   # fee in foreign
+    "memo",
+]
+
+
+def load_settings() -> dict:
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def save_settings(settings: dict) -> None:
+    try:
+        SETTINGS_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 @st.cache_data(show_spinner=False)
 def fetch_historical_fx_bulk(
@@ -564,9 +544,9 @@ def recompute_average_cost(trades_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_trades(base_ccy: str, recalc_fx: bool, data_file: Path) -> pd.DataFrame:
-    if data_file.exists():
-        df = pd.read_csv(data_file, sep=";")
+def load_trades(base_ccy: str, recalc_fx: bool) -> pd.DataFrame:
+    if DATA_FILE.exists():
+        df = pd.read_csv(DATA_FILE, sep=";")
     else:
         df = pd.DataFrame(columns=FX_INPUT_COLS)
 
@@ -600,12 +580,12 @@ def load_trades(base_ccy: str, recalc_fx: bool, data_file: Path) -> pd.DataFrame
     return df
 
 
-def save_trades(df: pd.DataFrame, data_file: Path) -> None:
+def save_trades(df: pd.DataFrame) -> None:
     to_save = df[FX_INPUT_COLS].copy()
     to_save["date"] = pd.to_datetime(to_save["date"], errors="coerce").dt.strftime(
         "%Y-%m-%d"
     )
-    to_save.to_csv(data_file, index=False, sep=";")
+    to_save.to_csv(DATA_FILE, index=False, sep=";")
 
 
 def build_positions_summary(trades_df: pd.DataFrame) -> pd.DataFrame:
@@ -689,6 +669,7 @@ def parse_float(text: str, field_name: str):
         return None
 
 
+
 # =========================
 # LOGIN (Google OIDC OR Local)
 # =========================
@@ -712,7 +693,7 @@ if not google_logged_in and not local_logged_in:
         u = st.text_input("Username", key="local_login_user")
         p = st.text_input("Password", type="password", key="local_login_pass")
 
-        if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Log in\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
+        if st.button("      Log in      "):
             ok, msg, safe_user = authenticate_user(u, p)
             if ok:
                 st.session_state["local_logged_in"] = True
@@ -727,7 +708,7 @@ if not google_logged_in and not local_logged_in:
             npw = st.text_input("New password", type="password", key="local_new_pass")
             npw2 = st.text_input("Repeat new password", type="password", key="local_new_pass2")
 
-            if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Create account\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
+            if st.button("      Create account      "):
                 if npw != npw2:
                     st.error("Passwords do not match.")
                 else:
@@ -737,21 +718,10 @@ if not google_logged_in and not local_logged_in:
                     else:
                         st.error(msg)
 
-    # Google login tab (MUST be inside this if-block)
     with tab_google:
-        if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Log in with Google\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
-            st.login()
-            st.stop()  # do not continue executing this run
+        if st.button("      Log in with Google      "):
+            st.login()  # uses [auth] from secrets.toml
 
-    # Stop here so the rest of the app does not run until authenticated
-    st.stop()
-
-# Determine login state AFTER the auth attempt (i.e., on reruns after callback)
-google_logged_in = getattr(st.user, "is_logged_in", False)
-local_logged_in = bool(st.session_state.get("local_username"))
-
-# Stop rendering if no login method has succeeded yet
-if not google_logged_in and not local_logged_in:
     st.stop()
 
 # Determine username depending on auth mode
@@ -768,7 +738,6 @@ else:
         st.error("Local login session is missing a username.")
         st.stop()
 
-
 # Use this username to get per-user files
 DATA_FILE, SETTINGS_FILE = get_user_paths(username)
 
@@ -776,7 +745,7 @@ DATA_FILE, SETTINGS_FILE = get_user_paths(username)
 # STATE & SETTINGS
 # =========================
 
-_settings = load_settings(SETTINGS_FILE)
+_settings = load_settings()
 _last_base = _settings.get("base_ccy", DEFAULT_BASE_CCY)
 
 if "history_edit_mode" not in st.session_state:
@@ -795,11 +764,14 @@ with st.sidebar:
 
     hide_values = st.toggle("Hide values", value=False)
 
+
     st.divider()
 
     # --- Portfolio file import / export (per-user) ---
     if DATA_FILE.exists():
         csv_bytes = DATA_FILE.read_bytes()
+
+        import base64
         b64 = base64.b64encode(csv_bytes).decode()
 
         st.markdown(
@@ -812,34 +784,38 @@ with st.sidebar:
                 border-radius: 0.5rem;
                 background-color: var(--secondary-background-color);
                 color: var(--text-color);
-                text-decoration: none !important;
+                text-decoration: none !important;  /* remove underline */
                 font-weight: 500;
                 border: 1px solid rgba(255, 255, 255, 0.15);
                 text-align: center;
                 font-size: 0.9rem;
                 box-sizing: border-box;
+
+                /* This creates the "raised" look Streamlit uses */
                 box-shadow: 0 0.15rem 0.3rem rgba(0,0,0,0.25);
                 transition: all 0.15s ease;
             }}
+
             .ios-download-button:hover {{
                 background-color: rgba(255,255,255,0.15);
                 border-color: rgba(255,255,255,0.25);
                 box-shadow: 0 0.25rem 0.35rem rgba(0,0,0,0.35);
-                text-decoration: none !important;
+                text-decoration: none !important;  /* also remove underline on hover */
             }}
             </style>
 
             <a class="ios-download-button"
                href="data:text/csv;base64,{b64}"
-               download="{username}_fx_trades.csv">
+               download="fx_trades.csv">
                ⬇️ Download FX trades
             </a>
             """,
-            unsafe_allow_html=True,
+            unsafe_allow_html=True
         )
     else:
         st.caption("No FX trades file yet.")
 
+    # Upload FX trades
     uploaded_file = st.file_uploader(
         "Upload/Replace FX trades",
         type=["csv"],
@@ -856,6 +832,9 @@ with st.sidebar:
 
     st.divider()
 
+    st.caption(f"Data file: `{DATA_FILE}`")
+
+    st.divider()
     st.markdown(f":blue[User: **{username}**]")
     if st.button("🚪 Logout", use_container_width=True):
         if getattr(st.user, "is_logged_in", False):
@@ -867,11 +846,11 @@ with st.sidebar:
 
 recalc_fx = base_ccy != _last_base
 
-trades_df = load_trades(base_ccy, recalc_fx=recalc_fx, data_file=DATA_FILE)
+trades_df = load_trades(base_ccy, recalc_fx=recalc_fx)
 if recalc_fx:
-    save_trades(trades_df, DATA_FILE)
+    save_trades(trades_df)
     _settings["base_ccy"] = base_ccy
-    save_settings(_settings, SETTINGS_FILE)
+    save_settings(_settings)
 
 positions_summary = build_positions_summary(trades_df)
 
@@ -956,7 +935,7 @@ with tab_holdings:
         ].copy()
 
         display = display.sort_values("market_value_base", ascending=False)
-
+        
         display = display.rename(
             columns={
                 "foreign_ccy": "Currency",
@@ -989,7 +968,7 @@ with tab_holdings:
 
                 elif col != "Currency" and np.issubdtype(display[col].dtype, np.number):
                     # All other numeric values with 2 decimals
-                    display[col] = display[col].apply(lambda x: f"{x:,.2f}")
+                    display[col] = display[col].apply(lambda x: f"{x:,.2f}")            
 
         st.dataframe(
             display,
@@ -1000,7 +979,7 @@ with tab_holdings:
 
 # ---------- TAB: NEW TRANSACTION ----------
 with tab_new:
-
+    
     auto_fx = st.checkbox(
         "Auto FX",
         value=True,
@@ -1045,7 +1024,7 @@ with tab_new:
 
         memo = st.text_input("Memo / Note")
 
-        submitted = st.form_submit_button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0💾 Save transaction\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0", type="primary")
+        submitted = st.form_submit_button("💾 Save transaction", type="primary")
 
     if submitted:
         valid = True
@@ -1075,8 +1054,8 @@ with tab_new:
             fx_rate = None
 
         if valid and auto_fx:
-            dt_ = datetime.combine(t_date, datetime.min.time())
-            fx_rate = fetch_historical_fx(dt_, t_ccy, base_ccy)
+            dt = datetime.combine(t_date, datetime.min.time())
+            fx_rate = fetch_historical_fx(dt, t_ccy, base_ccy)
             if fx_rate <= 0:
                 st.error("Failed to fetch a valid FX rate.")
                 valid = False
@@ -1117,26 +1096,34 @@ with tab_new:
                     existing[FX_INPUT_COLS]
                     if not existing.empty
                     else pd.DataFrame(columns=FX_INPUT_COLS),
-                    pd.DataFrame([new_row], columns=FX_INPUT_COLS),
+                    pd.DataFrame([new_row]),
                 ],
                 ignore_index=True,
             )
+            save_trades(combined)
 
-            combined = load_trades(base_ccy, recalc_fx=False, data_file=DATA_FILE) if False else recompute_average_cost(combined)
-
-            save_trades(combined, DATA_FILE)
             st.success("Transaction saved.")
             st.rerun()
 
 
 # ---------- TAB: HISTORY ----------
 with tab_history:
+    spacer, toggle_col = st.columns([5, 1])
+    with toggle_col:
+        current_edit = st.session_state.get("history_edit_mode", False)
+        toggle_val = st.toggle(
+            "Enable Edit Mode",
+            value=current_edit,
+            key="history_edit_toggle",
+            help="Toggle to enable editing (add/remove/change rows). Remember to save.",
+        )
+        st.session_state.history_edit_mode = toggle_val
 
     if trades_df.empty:
-        st.info("No transactions yet.")
+        st.info("No FX transactions recorded yet.")
     else:
-        # Show raw, plus computed columns helpful for debugging / transparency
-        show_cols = [
+        # Columns: Date; Currency; Transaction type; Amount; Fx Rate; Fees; Memo
+        history_cols = [
             "date",
             "foreign_ccy",
             "txn_type",
@@ -1144,22 +1131,120 @@ with tab_history:
             "fx_rate",
             "fee_foreign",
             "memo",
-            "base_amount",
-            "fee_base",
-            "realized_pl_base",
-            "running_position",
-            "running_cost_base",
-            "running_avg_cost",
         ]
-        existing_cols = [c for c in show_cols if c in trades_df.columns]
-        hist = trades_df[existing_cols].copy()
 
-        if hide_values:
-            for c in hist.columns:
-                if c not in ["date", "foreign_ccy", "txn_type", "memo"]:
-                    hist[c] = "••••••"
+        if not st.session_state.history_edit_mode:
+            # --- READ-ONLY VIEW ---
+            display = trades_df[history_cols].copy()
+            display["date"] = display["date"].dt.date
+            display = display.rename(
+                columns={
+                    "date": "Date",
+                    "foreign_ccy": "Currency",
+                    "txn_type": "Transaction type",
+                    "foreign_amount": "Amount",
+                    "fx_rate": "Fx Rate",
+                    "fee_foreign": "Fees",
+                    "memo": "Memo",
+                }
+            )
 
-        st.dataframe(hist, use_container_width=True, hide_index=True)
+            if hide_values:
+                for col in ["Amount", "Fx Rate", "Fees"]:
+                    display[col] = "••••••"
+            else:
+                for col in ["Amount"]:
+                    display[col] = display[col].abs()
+
+            st.dataframe(
+                display.sort_values("Date", ascending=False),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        else:
+            # --- EDITABLE VIEW (slider ON) ---
+            editable = trades_df[history_cols].sort_values("date", ascending=False).copy()
+            # Show date as string for editing
+            editable["date"] = editable["date"].dt.strftime("%Y-%m-%d")
+            editable["foreign_amount"] = editable["foreign_amount"].abs()
+            
+
+            editable = editable.rename(
+                columns={
+                    "date": "Date",
+                    "foreign_ccy": "Currency",
+                    "Transaction type": "txn_type",
+                    "txn_type": "Transaction type",
+                    "foreign_amount": "Amount",
+                    "fx_rate": "Fx Rate",
+                    "fee_foreign": "Fees",
+                    "memo": "Memo",
+                }
+            )
+            
+            edited_df = st.data_editor(
+                 editable,
+                 num_rows="dynamic",
+                 use_container_width=True,
+                 key="history_editor",
+            )
+
+            st.caption("Tip: Use the slider above to exit edit mode after saving.")
+
+            # Small save button under the editor
+            if st.button("💾 Save changes", key="save_history_btn"):
+                try:
+                    # Map back to internal column names
+                    updated = edited_df.rename(
+                        columns={
+                            "Date": "date",
+                            "Currency": "foreign_ccy",
+                            "Transaction type": "txn_type",
+                            "Amount": "foreign_amount",
+                            "Fx Rate": "fx_rate",
+                            "Fees": "fee_foreign",
+                            "Memo": "memo",
+                        }
+                    ).copy()
+
+                    # Parse date
+                    updated["date"] = pd.to_datetime(updated["date"], errors="coerce")
+
+                    # Normalize currency & txn type
+                    updated["foreign_ccy"] = (
+                        updated["foreign_ccy"].astype(str).str.upper()
+                    )
+                    updated["txn_type"] = updated["txn_type"].astype(str)
+
+                    # Numeric fields
+                    for col in ["foreign_amount", "fx_rate", "fee_foreign"]:
+                        updated[col] = (
+                            updated[col]
+                            .astype(str)
+                            .str.replace(",", ".", regex=False)
+                            .pipe(pd.to_numeric, errors="coerce")
+                            .fillna(0.0)
+                        )
+
+                    # Drop completely empty / invalid rows
+                    mask_valid = (
+                        updated["date"].notna()
+                        & updated["foreign_ccy"].astype(str).str.len().gt(0)
+                        & updated["txn_type"].astype(str).str.len().gt(0)
+                    )
+                    updated = updated[mask_valid].copy()
+
+                    # This becomes the new raw trades dataset
+                    new_trades = updated[history_cols].copy()
+                    new_trades = recompute_average_cost(new_trades)
+                    save_trades(new_trades)
+
+                    st.success("History updated.")
+                    # Keep edit mode state as-is; user can slide it off when done
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save changes: {e}")
 
 
 # ---------- TAB: REALIZED P/L ----------
@@ -1168,42 +1253,111 @@ with tab_pl:
     if trades_df.empty:
         st.info("No transactions yet.")
     else:
-        d = trades_df.copy()
-        d["date"] = pd.to_datetime(d["date"], errors="coerce").dt.date
+        # Date range bounds from data
+        min_dt = trades_df["date"].min().date()
+        max_dt = trades_df["date"].max().date()
 
-        # Only sell/debit rows contribute realized P/L in this model
-        mask = d["txn_type"].astype(str).str.upper().isin(["SELL", "DEBIT"])
-        realized_rows = d[mask].copy()
+        # Use the latest data date (or today, whichever is earlier) as reference
+        today = dt.date.today()
+        reference_date = min(max_dt, today)
 
-        if realized_rows.empty:
-            st.info("No realized P/L yet (no sells/debits).")
+        # Date range selector (dropdown)
+        range_options = ["Year to date", "Last calendar year", "Last 12 months", "Custom range"]
+        selected_range = st.selectbox("Date range", range_options, index=0)
+
+        # Compute start_date and end_date based on selection
+        if selected_range == "Year to date":
+            year_start = dt.date(reference_date.year, 1, 1)
+            start_date = max(year_start, min_dt)
+            end_date = reference_date
+
+        elif selected_range == "Last calendar year":
+            last_year = reference_date.year - 1
+            start_candidate = dt.date(last_year, 1, 1)
+            end_candidate = dt.date(last_year, 12, 31)
+
+            # Clamp to available data
+            start_date = max(start_candidate, min_dt)
+            end_date = min(end_candidate, max_dt)
+
+        elif selected_range == "Last 12 months":
+            end_date = reference_date
+            start_candidate = end_date - dt.timedelta(days=365)
+            start_date = max(start_candidate, min_dt)
+
+        else:  # "Custom range"
+            col1, col2 = st.columns(2)
+            start_date = col1.date_input("From", value=min_dt, min_value=min_dt, max_value=max_dt)
+            end_date = col2.date_input("To", value=max_dt, min_value=min_dt, max_value=max_dt)
+
+        if start_date > end_date:
+            st.error("Start date cannot be after end date.")
         else:
-            # Aggregate by currency
-            agg = realized_rows.groupby("foreign_ccy", as_index=False).agg(
-                realized_pl_base=("realized_pl_base", "sum"),
-                proceeds_base=("sale_proceeds_base", "sum"),
-                cost_base=("sale_cost_base", "sum"),
+            # Filter data based on computed range
+            mask_range = (
+                (trades_df["date"].dt.date >= start_date)
+                & (trades_df["date"].dt.date <= end_date)
             )
+            df_range = trades_df[mask_range].copy()
 
-            agg = agg.rename(
-                columns={
-                    "foreign_ccy": "Currency",
-                    "realized_pl_base": f"Realized P/L ({base_ccy})",
-                    "proceeds_base": f"Proceeds ({base_ccy})",
-                    "cost_base": f"Cost basis sold ({base_ccy})",
-                }
-            )
+            # Only Sell/Debit rows have realized P/L
+            df_real = df_range[df_range["txn_type"].isin(["Sell", "Debit"])].copy()
 
-            if hide_values:
-                for col in agg.columns:
-                    if col != "Currency":
-                        agg[col] = "••••••"
+            if df_real.empty:
+                st.info("No realized P/L in the selected period.")
             else:
-                for col in agg.columns:
-                    if col != "Currency":
-                        agg[col] = agg[col].apply(lambda x: f"{x:,.2f}")
+                grouped = (
+                    df_real.groupby("foreign_ccy")
+                    .agg(
+                        Qty=("foreign_amount", lambda x: np.abs(x).sum()),
+                        Cost=("sale_cost_base", "sum"),
+                        Proceeds=("sale_proceeds_base", "sum"),
+                        Realized=("realized_pl_base", "sum"),
+                    )
+                    .reset_index()
+                )
 
-            st.dataframe(agg, use_container_width=True, hide_index=True)
+                total_realized_period = grouped["Realized"].sum()
+
+                if hide_values:
+                    total_str = "••••••"
+                else:
+                    total_str = f"{total_realized_period:,.2f}"
+
+                st.markdown(
+                    f"<div style='font-size:0.85rem; opacity:0.8;'>Total realized P&L "
+                    f"({base_ccy}) from {start_date} to {end_date}</div>"
+                    f"<div style='font-size:1.2rem; font-weight:700; margin-bottom:0.2rem;'>{total_str}</div>",
+                    unsafe_allow_html=True,
+                )
+
+                display = grouped.copy()
+                display = display.rename(
+                    columns={
+                        "foreign_ccy": "Currency",
+                        "Qty": "Qty",
+                        "Cost": f"Cost ({base_ccy})",
+                        "Proceeds": f"Proceeds ({base_ccy})",
+                        "Realized": f"Realized P&L ({base_ccy})",
+                    }
+                )
+
+                if hide_values:
+                    for col in display.columns:
+                        if col != "Currency":
+                            display[col] = "••••••"
+                else:
+                    for col in display.columns:
+                        if col != "Currency" and np.issubdtype(display[col].dtype, np.number):
+                            display[col] = display[col].apply(lambda x: f"{x:,.2f}")
+
+                st.dataframe(
+                    display,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+
 
 
 
