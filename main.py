@@ -1026,7 +1026,7 @@ with tab_new:
 
         memo = st.text_input("Memo / Note")
 
-        submitted = st.form_submit_button("💾 Save transaction", type="primary")
+        submitted = st.form_submit_button("      💾 Save transaction      ", type="primary")
 
     if submitted:
         valid = True
@@ -1358,6 +1358,7 @@ with tab_pl:
                     use_container_width=True,
                     hide_index=True,
                 )
+
 
 
 
