@@ -2,6 +2,7 @@
 
 An app to track cash holdings in different foreign currencies.
 
+
 ![Alt text](docs/img.png)
 
 
