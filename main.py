@@ -739,7 +739,7 @@ if not google_logged_in and not local_logged_in:
 
 # Google login tab
 with tab_google:
-    if st.button("      Log in with Google      "):
+    if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Log in with Google\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
         st.login()  # uses [auth] from secrets.toml
         st.rerun()
 
@@ -1200,5 +1200,6 @@ with tab_pl:
                         agg[col] = agg[col].apply(lambda x: f"{x:,.2f}")
 
             st.dataframe(agg, use_container_width=True, hide_index=True)
+
 
 
