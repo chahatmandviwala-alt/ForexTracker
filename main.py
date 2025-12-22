@@ -806,7 +806,7 @@ with st.sidebar:
 
             <a class="ios-download-button"
                href="data:text/csv;base64,{b64}"
-               download="{filename}">
+               download="fx_trades.csv">
                ⬇️ Download FX trades
             </a>
             """,
@@ -1356,6 +1356,7 @@ with tab_pl:
                     use_container_width=True,
                     hide_index=True,
                 )
+
 
 
 
