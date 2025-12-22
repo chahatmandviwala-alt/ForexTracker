@@ -17,6 +17,13 @@ import hmac
 # BASIC STYLING & CONFIG
 # =========================
 
+st.set_page_config(
+    page_title="FX Portfolio Tracker",
+    page_icon="💱",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
 st.markdown("""
 <style>
 /* Hide the 'Press Enter to submit form' helper text everywhere */
@@ -26,12 +33,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(
-    page_title="FX Portfolio Tracker",
-    page_icon="💱",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
 
 # Tighten layout a bit
 st.markdown("""
@@ -1191,3 +1192,4 @@ with tab_pl:
                         agg[col] = agg[col].apply(lambda x: f"{x:,.2f}")
 
             st.dataframe(agg, use_container_width=True, hide_index=True)
+
