@@ -737,20 +737,22 @@ if not google_logged_in and not local_logged_in:
                     else:
                         st.error(msg)
 
-# Google login tab
+# --- Google login tab ---
+# NOTE: Keep this inside the same block where tab_google is created.
 with tab_google:
     if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Log in with Google\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
         st.login()
-        st.rerun()
+        st.stop()  # do not continue executing this run; let Streamlit complete the auth flow
 
-# Determine login state AFTER the auth attempt
+# --- Determine login state AFTER (potential) auth attempt ---
 google_logged_in = getattr(st.user, "is_logged_in", False)
+local_logged_in = bool(st.session_state.get("local_username"))
 
-# Stop rendering if no login method has succeeded yet
-if not google_logged_in and not st.session_state.get("local_username"):
+# --- Stop rendering if no login method has succeeded yet ---
+if not google_logged_in and not local_logged_in:
     st.stop()
 
-# Determine username depending on auth mode
+# --- Determine username depending on auth mode ---
 if google_logged_in:
     user = st.user
     user_id = getattr(user, "email", None) or getattr(user, "sub", None)
@@ -763,6 +765,7 @@ else:
     if not username:
         st.error("Local login session is missing a username.")
         st.stop()
+
 
 
 # Use this username to get per-user files
@@ -1200,6 +1203,7 @@ with tab_pl:
                         agg[col] = agg[col].apply(lambda x: f"{x:,.2f}")
 
             st.dataframe(agg, use_container_width=True, hide_index=True)
+
 
 
 
