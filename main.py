@@ -774,6 +774,8 @@ with st.sidebar:
         import base64
         b64 = base64.b64encode(csv_bytes).decode()
 
+        download_name = f"fx_trades_{username}.csv"
+        
         st.markdown(
             f"""
             <style>
@@ -806,7 +808,7 @@ with st.sidebar:
 
             <a class="ios-download-button"
                href="data:text/csv;base64,{b64}"
-               download="fx_trades.csv">
+               download="{download_name}"> 
                ⬇️ Download FX trades
             </a>
             """,
@@ -1356,6 +1358,7 @@ with tab_pl:
                     use_container_width=True,
                     hide_index=True,
                 )
+
 
 
 
