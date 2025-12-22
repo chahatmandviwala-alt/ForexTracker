@@ -6,3 +6,4 @@ numpy
 requests
 plotly
 yfinance
+Authlib>=1.3.2
