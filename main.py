@@ -737,10 +737,17 @@ if not google_logged_in and not local_logged_in:
                     else:
                         st.error(msg)
 
-    with tab_google:
-        if st.button("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0Log in with Google\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"):
-            st.login()  # uses [auth] from secrets.toml
+# Google login tab
+with tab_google:
+    if st.button("      Log in with Google      "):
+        st.login()  # uses [auth] from secrets.toml
+        st.rerun()
 
+# Determine login state AFTER the auth attempt
+google_logged_in = getattr(st.user, "is_logged_in", False)
+
+# Stop rendering if no login method has succeeded yet
+if not google_logged_in and not st.session_state.get("local_username"):
     st.stop()
 
 # Determine username depending on auth mode
@@ -756,6 +763,7 @@ else:
     if not username:
         st.error("Local login session is missing a username.")
         st.stop()
+
 
 # Use this username to get per-user files
 DATA_FILE, SETTINGS_FILE = get_user_paths(username)
@@ -1192,4 +1200,5 @@ with tab_pl:
                         agg[col] = agg[col].apply(lambda x: f"{x:,.2f}")
 
             st.dataframe(agg, use_container_width=True, hide_index=True)
+
 
