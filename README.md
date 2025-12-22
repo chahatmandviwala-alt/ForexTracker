@@ -1,4 +1,4 @@
-# Portfolio Tracker
+# Forex Tracker
 
 An app to track cash holdings in different foreign currencies.
 
