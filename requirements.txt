@@ -1,0 +1,9 @@
+streamlit[auth]>=1.42
+pandas
+numpy
+requests
+altair
+plotly
+Authlib>=1.3.2
+yfinance
+
